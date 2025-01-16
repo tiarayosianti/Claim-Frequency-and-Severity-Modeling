@@ -1,7 +1,7 @@
 ```{r}
 library(readxl)
 #memanggil data dan melihat strukturnya
-mcins=read_xlsx("D:/KULIAH/SEMESTER 5/MODEL LINEAR TERGENERALISASI/GLMproj2.xlsx")
+mcins=read_xlsx("D:/GLMproj2.xlsx")
 head(mcins)
 str(mcins)
 ```

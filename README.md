@@ -1,4 +1,4 @@
-# Premium Relativity Calculation for Motor Vehicle Insurance  
+# Modeling Claim Frequency and Severity for Motor Vehicle Insurance Premium Calculation
 
 ## Objective  
 Accurately calculating premiums is vital for maintaining financial stability in the insurance industry while providing competitive pricing to policyholders. Underpricing can lead to financial losses, whereas overpricing may drive customers to competitors.  

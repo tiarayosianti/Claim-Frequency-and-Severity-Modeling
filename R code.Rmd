@@ -1,0 +1,784 @@
+```{r}
+library(readxl)
+#memanggil data dan melihat strukturnya
+mcins=read_xlsx("D:/KULIAH/SEMESTER 5/MODEL LINEAR TERGENERALISASI/GLMproj2.xlsx")
+head(mcins)
+str(mcins)
+```
+```{r}
+#PREPOCESSING DATA
+#mengubah tipe data dan pengelompokan
+mcins$gender <- as.factor(mcins$gender)
+mcins$zon <- as.factor(mcins$zon)
+mcins$duration <- as.numeric(mcins$duration)
+mcins$mcklass <- as.factor(mcins$mcklass)
+mcins$bonus <- as.factor(mcins$bonus)
+mcins$rating.3 <- mcins$zon
+mcins$rating.4 <- mcins$mcklass
+mcins$rating.5 <-
+  cut(mcins$`Vec-age`, breaks = c(0, 1, 4, 99),
+      labels = as.character(1:3), include.lowest = TRUE,
+      ordered_result = FALSE)
+mcins$rating.6 <- as.factor(mcins$bonus)
+levels(mcins$rating.6) <-                 
+  c("1", "1", "2", "2", rep("3", 3))
+mcins$rating.1 <-
+  cut(mcins$`Age`, breaks = c(0,19,39,59,79,99),
+      labels = as.character(1:5), include.lowest = TRUE,
+      ordered_result = FALSE)
+mcins$rating.2 <- mcins$gender
+save(mcins, file = "mcins.RData")
+if (!exists("mcins"))
+  load("mcins.RData")
+## ubah ke data.table
+library("data.table")
+mcins <- data.table(mcins, key = paste("rating", 1:6, sep = "."))
+## mengelompokkan duration, numb.claim, dan claim cost berdasarkan rating factor dengan level yang sama
+mcins.current <-
+  mcins[,
+        list(duration = sum(duration),
+             nbclaim = sum(nbclaim),
+             Severity = sum(Severity),
+             num.policies = .N),
+        by = key(mcins)]  
+## mengubah frequency and severity. ubah NaN ke NA.
+mcins.current$claim.freq <-
+  with(mcins.current, ifelse(duration != 0, nbclaim / duration, NA_real_))
+mcins.current$claim.severity <-
+  with(mcins.current, ifelse(nbclaim != 0, Severity / nbclaim, NA_real_))
+## Simpan data
+save(mcins.current, file = "mcins.current.RData")
+```
+```{r}
+## Load data if needed
+library("data.table")
+if (!exists("mcins"))
+  load("mcins.RData")
+if (!exists("mcins.current"))
+  load("mcins.current.RData")
+if (!is(mcins, "data.table"))
+  mcins <- data.table(mcins, key = paste("rating", 1:6, sep = "."))
+```
+```{r}
+#visualisasi rating factor
+library("grid")
+library("ggplot2")
+plot.titles <- c("Age", "Gender", "Geographic zone", "MC Class", "Vehicle Age", "Bonus Class")
+plots <-
+  lapply(1:6,
+         function(i)
+           ggplot(mcins.current, aes(nbclaim))
+         + geom_boxplot(aes(weight = duration))
+         + scale_x_discrete(limits = c(0, 2))
+         + scale_y_log10()
+         + facet_grid(paste("rating.", i, " ~ .", sep = ""),
+                      scales = "fixed")
+         ## We drop the axis titles to make more room for the data
+         + labs (title = plot.titles[i])
+  )
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 1, ncol = 6)))
+## We can ignore the warnings from displaying the plots for now
+for (i in 1:6){
+  print(plots[[i]], vp = viewport(layout.pos.col = i))}
+```
+```{r}
+# visualisasi boxplot rating factor terhadap number of claim
+means <- aggregate(nbclaim~rating.1, data = mcins.current, mean)
+ggplot(data=mcins.current, aes(x=rating.1, y=nbclaim, fill=rating.1)) + geom_boxplot() +
+  stat_summary(fun=mean, colour="darkred", geom="point", 
+               shape=18, size=3, show.legend=FALSE)  +
+  geom_text(data = means, aes(label = round(nbclaim,4), y = nbclaim + 1.5))
+
+means <- aggregate(nbclaim~rating.2, data = mcins.current, mean)
+ggplot(data=mcins.current, aes(x=rating.2, y=nbclaim, fill=rating.2)) + geom_boxplot() +
+  stat_summary(fun=mean, colour="darkred", geom="point", 
+               shape=18, size=3, show.legend=FALSE)  +
+  geom_text(data = means, aes(label = round(nbclaim,4), y = nbclaim + 2.5))
+
+means <- aggregate(nbclaim~rating.3, data = mcins.current, mean)
+ggplot(data=mcins.current, aes(x=rating.3, y=nbclaim, fill=rating.3)) + geom_boxplot() +
+  stat_summary(fun=mean, colour="darkred", geom="point", 
+               shape=18, size=3, show.legend=FALSE)  +
+  geom_text(data = means, aes(label = round(nbclaim,4), y = nbclaim + 2.5))
+
+means <- aggregate(nbclaim~rating.4, data = mcins.current, mean)
+ggplot(data=mcins.current, aes(x=rating.4, y=nbclaim, fill=rating.4)) + geom_boxplot() +
+  stat_summary(fun=mean, colour="darkred", geom="point", 
+               shape=18, size=3, show.legend=FALSE)  +
+  geom_text(data = means, aes(label = round(nbclaim,4), y = nbclaim + 2.5))
+
+means <- aggregate(nbclaim~rating.5, data = mcins.current, mean)
+ggplot(data=mcins.current, aes(x=rating.5, y=nbclaim, fill=rating.5)) + geom_boxplot() +
+  stat_summary(fun=mean, colour="darkred", geom="point", 
+               shape=18, size=3, show.legend=FALSE)  +
+  geom_text(data = means, aes(label = round(nbclaim,4), y = nbclaim + 2.5))
+
+means <- aggregate(nbclaim~rating.6, data = mcins.current, mean)
+ggplot(data=mcins.current, aes(x=rating.6, y=nbclaim, fill=rating.6)) + geom_boxplot() +
+  stat_summary(fun=mean, colour="darkred", geom="point", 
+               shape=18, size=3, show.legend=FALSE)  +
+  geom_text(data = means, aes(label = round(nbclaim,4), y = nbclaim + 2.5))
+```
+```{r}
+boxplot(nbclaim~rating.1,data=mcins.current, col="blue",xlab="Age",ylab="Number of Claim")
+boxplot(nbclaim~rating.2,data=mcins.current, col="blue",xlab="Gender",ylab="Number of Claim")
+boxplot(nbclaim~rating.3,data=mcins.current, col="blue",xlab="Geographic Zone",ylab="Number of Claim")
+boxplot(nbclaim~rating.4,data=mcins.current, col="blue",xlab="MC Class",ylab="Number of Claim")
+boxplot(nbclaim~rating.5,data=mcins.current, col="blue",xlab="Vehicle Age",ylab="Number of Claim")
+boxplot(nbclaim~rating.6,data=mcins.current, col="blue",xlab="Bonus Class",ylab="Number of Claim")
+```
+```{r}
+#data dengan level exposure terbesar
+print(basecell<- mcins.current[which.max(mcins.current$duration),1:6])
+# we want (3,M,4,5,3,3) to be the base tariff cell (as it has the largest exposure), reorder the levels of each categorical variable
+print(mcins.current$rating.1<- relevel(mcins.current$rating.1, as.character(basecell$rating.1)))
+print(mcins.current$rating.2<- relevel(mcins.current$rating.2, as.character(basecell$rating.2)))
+print(mcins.current$rating.3<- relevel(mcins.current$rating.3, as.character(basecell$rating.3)))
+print(mcins.current$rating.4<- relevel(mcins.current$rating.4, as.character(basecell$rating.4)))
+print(mcins.current$rating.5<- relevel(mcins.current$rating.5, as.character(basecell$rating.5)))
+print(mcins.current$rating.6<- relevel(mcins.current$rating.6, as.character(basecell$rating.6)))
+basecell
+```
+```{r}
+##----------CLAIM FREQUENCY----------
+#MODEL AWAL
+#pemodelan frequency : poisson
+summary(model.frequency1<-glm(nbclaim ~ rating.1 + rating.2 + rating.3 + rating.4+rating.5 + rating.6 + offset(log(duration)), data = mcins.current[mcins.current$duration>0,], family=poisson))
+#deviance
+with(model.frequency1, cbind(res.deviance = deviance, df = df.residual, p = pchisq(deviance, df.residual, lower.tail = FALSE)))
+# This is to be compared with the critical value of the test at a 95% confidence level 
+qchisq(0.95,model.frequency1$df.residual)
+1-pchisq(model.frequency1$deviance, model.frequency1$df.residual)
+```
+Diperoleh residual deviance=900.5764 < critical value=1942.96
+Model poisson bagus atau layak digunakan
+
+```{r}
+#standarisasi untuk melihat mana yg perlu di merge dengan mempertimbangkan kemiripan struktur data
+#syntax standarisasi
+df=mcins.current
+df$nbclaim <- scale(df$nbclaim) 
+#untuk data yg sudah distandarisasai, mean antar faktor pada boxplot terlihat relatif sama (segaris)
+#menghilangkan NA di nbclaim
+#df2 <- df[rowSums(is.na(df)) == 0,]
+# visualisasi boxplot rating factor terhadap claim freq
+boxplot(nbclaim~rating.1,data=df2, col="yellow",xlab="Age",ylab="Claim Frequency")
+#untuk age kelompok 5 tidak muncul boxplot karena claim freqnya Na
+boxplot(nbclaim~rating.2,data=df2, col="yellow",xlab="Gender",ylab="Claim Frequency")
+boxplot(nbclaim~rating.3,data=df2, col="yellow",xlab="Geographic Zone",ylab="Claim Frequency")
+boxplot(nbclaim~rating.4,data=df2, col="yellow",xlab="MC Class",ylab="Claim Frequency")
+boxplot(nbclaim~rating.5,data=df2, col="yellow",xlab="Vehicle Age",ylab="Claim Frequency")
+boxplot(nbclaim~rating.6,data=df2, col="yellow",xlab="Bonus Class",ylab="Claim Frequency")
+#pada df2, mean yang terlihat berbeda adalah pada geographic zone dan mcclas
+```
+```{r}
+#merger kategori
+library(dplyr)
+```
+```{r}
+#MERGE AGE
+#merger age kategroi 2 dan 4 by juraian, 5 masuk ke basecall
+mcins.current2=mcins.current
+levels(mcins.current2$rating.1)<-recode(levels(mcins.current2$rating.1), "3"="35")
+levels(mcins.current2$rating.1)<-recode(levels(mcins.current2$rating.1), "1"="14")
+levels(mcins.current2$rating.1)<-recode(levels(mcins.current2$rating.1), "4"="14")
+levels(mcins.current2$rating.1)<-recode(levels(mcins.current2$rating.1), "5"="35")
+head(mcins.current2)
+str(mcins.current2)
+#pemodelan frequency for age merger : poisson
+summary(model.frequency2<-glm(nbclaim ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6 + offset(log(duration)), data = mcins.current2[mcins.current2$duration>0,], family=poisson))
+#deviance
+with(model.frequency2, cbind(res.deviance = deviance, df = df.residual, p = pchisq(deviance, df.residual, lower.tail = FALSE)))
+# This is to be compared with the critical value of the test at a 95% confidence level 
+qchisq(0.95,model.frequency2$df.residual)
+1-pchisq(model.frequency2$deviance, model.frequency2$df.residual)
+```
+Diperoleh residual deviance=941.8805 < critical value=1945.014
+Model poisson bagus atau layak digunakan
+
+```{r}
+#MERGE AGE DAN ZONE
+#merger zone by sebaran data atau juraian yg mirip
+mcins.current3=mcins.current2
+levels(mcins.current3$rating.3)<-recode(levels(mcins.current3$rating.3), "5"="3567")
+levels(mcins.current3$rating.3)<-recode(levels(mcins.current3$rating.3), "6"="3567")
+levels(mcins.current3$rating.3)<-recode(levels(mcins.current3$rating.3), "7"="3567")
+levels(mcins.current3$rating.3)<-recode(levels(mcins.current3$rating.3), "3"="3567")
+head(mcins.current3)
+str(mcins.current3)
+#pemodelan frequency for age and zone merger: poisson
+summary(model.frequency3<-glm(nbclaim ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6 + offset(log(duration)), data = mcins.current3[mcins.current3$duration>0,], family=poisson))
+#deviance
+with(model.frequency3, cbind(res.deviance = deviance, df = df.residual, p = pchisq(deviance, df.residual, lower.tail = FALSE)))
+# This is to be compared with the critical value of the test at a 95% confidence level 
+qchisq(0.95,model.frequency3$df.residual)
+1-pchisq(model.frequency3$deviance, model.frequency3$df.residual)
+```
+Diperoleh residual deviance=948.9823 < critical value=1948.095
+Model poisson bagus atau layak digunakan
+
+```{r}
+#MERGE AGE, ZONE, DAN MC KLASS
+mcins.current4=mcins.current3
+#merger mc class by juraian dan bentuk boxplot lain (outlier)
+levels(mcins.current4$rating.4)<-recode(levels(mcins.current4$rating.4), "2"="1247")
+levels(mcins.current4$rating.4)<-recode(levels(mcins.current4$rating.4), "4"="1247")
+levels(mcins.current4$rating.4)<-recode(levels(mcins.current4$rating.4), "7"="1247")
+levels(mcins.current4$rating.4)<-recode(levels(mcins.current4$rating.4), "1"="1247")
+head(mcins.current4)
+str(mcins.current4)
+#pemodelan frequency for age zone, and mc klass merger: poisson
+summary(model.frequency4<-glm(nbclaim ~ rating.1 + rating.2 + rating.3 + rating.4+rating.5 + rating.6 + offset(log(duration)), data = mcins.current4[mcins.current4$duration>0,], family=poisson))
+#deviance
+with(model.frequency4, cbind(res.deviance = deviance, df = df.residual, p = pchisq(deviance, df.residual, lower.tail = FALSE)))
+# This is to be compared with the critical value of the test at a 95% confidence level 
+qchisq(0.95,model.frequency4$df.residual)
+1-pchisq(model.frequency4$deviance, model.frequency4$df.residual)
+```
+Diperoleh residual deviance=985.2739 < critical value=1951.177
+Model poisson bagus atau layak digunakan
+
+```{r}
+#MERGE AGE, ZONE, MCKLASS, DAN BONUS
+mcins.current5=mcins.current4
+levels(mcins.current5$rating.6)<-recode(levels(mcins.current5$rating.6), "1"="12")
+levels(mcins.current5$rating.6)<-recode(levels(mcins.current5$rating.6), "2"="12")
+head(mcins.current5)
+str(mcins.current5)
+#permodelan frequency for bonus marger : poisson
+summary(model.frequency5<-glm(nbclaim ~ rating.1 + rating.2 + rating.3 + rating.4+ rating.5 + rating.6 + offset(log(duration)), data = mcins.current5[mcins.current5$duration>0,], family=poisson))
+#deviance
+with(model.frequency5, cbind(res.deviance = deviance, df = df.residual, p = pchisq(deviance, df.residual, lower.tail = FALSE)))
+# This is to be compared with the critical value of the test at a 95% confidence level 
+qchisq(0.95,model.frequency5$df.residual)
+1-pchisq(model.frequency5$deviance, model.frequency5$df.residual)
+```
+Diperoleh residual deviance=959.1357 < critical value=1952.204
+Model poisson bagus atau layak digunakan
+
+```{r}
+#MENGELUARKAN BONUS
+mcins.current6=mcins.current5
+summary(model.frequency6<-glm(nbclaim ~ rating.1 + rating.2 + rating.3 + rating.4+ rating.5 + offset(log(duration)), data = mcins.current6[mcins.current6$duration>0,], family=poisson))
+#deviance
+with(model.frequency6, cbind(res.deviance = deviance, df = df.residual, p = pchisq(deviance, df.residual, lower.tail = FALSE)))
+# This is to be compared with the critical value of the test at a 95% confidence level 
+qchisq(0.95,model.frequency6$df.residual)
+1-pchisq(model.frequency6$deviance, model.frequency6$df.residual)
+```
+Diperoleh residual deviance=960.69 < critical value=1953.231
+Model poisson bagus atau layak digunakan
+
+```{r}
+#MENCARI MODEL TERBAIK
+#membandingkan model merger age dan model awal
+D1 = model.frequency2$deviance - model.frequency1$deviance
+dfD1 = model.frequency2$df.residual - model.frequency1$df.residual
+print(cbind(scaled.deviance=D1,df=dfD1, p.value=1-pchisq(D1, dfD1)))
+#p-value= 6.218104e-11<0.05, kesimpulan : model awal lebih bagus
+
+#membandingkan model marger age&zone dan model awal
+D2 = model.frequency3$deviance - model.frequency1$deviance
+dfD2 = model.frequency3$df.residual - model.frequency1$df.residual
+print(cbind(scaled.deviance=D2,df=dfD2, p.value=1-pchisq(D2, dfD2)))
+#p-value=0<0.05, kesimpulan : model awal lebih bagus
+
+#membandingkan model merger age, zone, dan mc klass dengan model awal
+D3 = model.frequency4$deviance - model.frequency1$deviance
+dfD3 = model.frequency4$df.residual - model.frequency1$df.residual
+print(cbind(scaled.deviance=D3,df=dfD3, p.value=1-pchisq(D3, dfD3)))
+#p-value=0<0.05, kesimpulan : model awal lebih bagus
+
+#membandingkan model merge age, zone, mcklass, dan bonus dengan model awal
+D4 = model.frequency5$deviance - model.frequency1$deviance
+dfD4 = model.frequency5$df.residual - model.frequency1$df.residual
+print(cbind(scaled.deviance=D4,df=dfD4, p.value=1-pchisq(D4, dfD4)))
+#p-value=0<0.05, kesimpulan : model awal lebih bagus
+
+#membandingkan model merge age, zone, mcklass, dan bonus dengan model awal
+D5 = model.frequency6$deviance - model.frequency1$deviance
+dfD5 = model.frequency6$df.residual - model.frequency1$df.residual
+print(cbind(scaled.deviance=D5,df=dfD5, p.value=1-pchisq(D5, dfD5)))
+#p-value=0<0.05, kesimpulan : model awal lebih bagus
+
+```
+KESIMPULAN : MODEL TERBAIK ADALAH MODEL AWAL (FULL MODEL)
+
+````{r}
+#RELATIVITIES
+#relativities dan interval konfidensinya untuk claim frequency
+print(resultsCF<-cbind(exp(model.frequency1$coefficients),
+                       exp(model.frequency1$coefficients-qnorm(0.975)*sqrt(diag(summary(model.frequency1)$cov.scaled))),
+                       exp(model.frequency1$coefficients+qnorm(0.975)*sqrt(diag(summary(model.frequency1)$cov.scaled)))))
+colnames(resultsCF)<-c("Relativities","LowerBound","UpperBound")
+resultsCF
+write.csv(resultsCF,'relCF.csv')
+```
+```{r}
+##---- SEVERITY -------
+#Model Pertama (Lengkap)
+model.gaus1 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                 data = mcins.current[mcins.current$nbclaim > 0,], family = gaussian(link = "log"),
+                 weights = nbclaim)
+summary(model.gaus1)
+```
+```{r}
+#Deviance
+sev.phi<-summary(model.gaus1)$dispersion
+cbind(scaled.deviance=model.gaus1$deviance/sev.phi,df=model.gaus1$df.residual,p=1-pchisq(model.gaus1$deviance/sev.phi, model.gaus1$df.residual))
+qchisq(0.95,model.gaus1$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Coba merge rating 3 : 567
+mcins.current6=mcins.current
+levels(mcins.current6$rating.3)<-recode(levels(mcins.current6$rating.3), "5"="567")
+levels(mcins.current6$rating.3)<-recode(levels(mcins.current6$rating.3), "6"="567")
+levels(mcins.current6$rating.3)<-recode(levels(mcins.current6$rating.3), "7"="567")
+head(mcins.current6)
+str(mcins.current6)
+model.gaus2 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current6[mcins.current6$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus2)
+```
+```{r}
+#Deviance
+sev.phi2<-summary(model.gaus2)$dispersion
+cbind(scaled.deviance=model.gaus2$deviance/sev.phi2,df=model.gaus2$df.residual,
+      p=1-pchisq(model.gaus2$deviance/sev.phi2, model.gaus2$df.residual))
+qchisq(0.95,model.gaus2$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 3 : no 2 masuk basecell (4)
+mcins.current7=mcins.current6
+levels(mcins.current7$rating.3)<-recode(levels(mcins.current7$rating.3), "4"="42")
+levels(mcins.current7$rating.3)<-recode(levels(mcins.current7$rating.3), "2"="42")
+head(mcins.current7)
+str(mcins.current7)
+model.gaus3 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current7[mcins.current7$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus3)
+```
+```{r}
+#Deviance
+sev.phi3<-summary(model.gaus3)$dispersion
+cbind(scaled.deviance=model.gaus3$deviance/sev.phi3,df=model.gaus3$df.residual,
+      p=1-pchisq(model.gaus3$deviance/sev.phi3, model.gaus3$df.residual))
+qchisq(0.95,model.gaus3$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#coba merge 2 ke 1 rating 5
+mcins.current8=mcins.current7
+levels(mcins.current8$rating.3)<-recode(levels(mcins.current8$rating.3), "42"="421")
+levels(mcins.current8$rating.3)<-recode(levels(mcins.current8$rating.3), "1"="421")
+head(mcins.current8)
+str(mcins.current8)
+model.gaus4 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current8[mcins.current8$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus4)
+```
+```{r}
+#Deviance
+sev.phi4<-summary(model.gaus4)$dispersion
+cbind(scaled.deviance=model.gaus4$deviance/sev.phi4,df=model.gaus4$df.residual,
+      p=1-pchisq(model.gaus4$deviance/sev.phi4, model.gaus4$df.residual))
+qchisq(0.95,model.gaus4$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 4 : no 1 2
+mcins.current9=mcins.current7
+levels(mcins.current9$rating.4)<-recode(levels(mcins.current9$rating.4), "1"="12")
+levels(mcins.current9$rating.4)<-recode(levels(mcins.current9$rating.4), "2"="12")
+head(mcins.current9)
+str(mcins.current9)
+model.gaus5 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current9[mcins.current9$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus5)
+```
+```{r}
+#Deviance
+sev.phi5<-summary(model.gaus5)$dispersion
+cbind(scaled.deviance=model.gaus5$deviance/sev.phi5,df=model.gaus5$df.residual,
+      p=1-pchisq(model.gaus5$deviance/sev.phi5, model.gaus5$df.residual))
+qchisq(0.95,model.gaus5$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 4 : no 34
+mcins.current10=mcins.current9
+levels(mcins.current10$rating.4)<-recode(levels(mcins.current10$rating.4), "3"="34")
+levels(mcins.current10$rating.4)<-recode(levels(mcins.current10$rating.4), "4"="34")
+head(mcins.current10)
+str(mcins.current10)
+model.gaus6 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current10[mcins.current10$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus6)
+```
+```{r}
+#Deviance
+sev.phi6<-summary(model.gaus6)$dispersion
+cbind(scaled.deviance=model.gaus6$deviance/sev.phi6,df=model.gaus6$df.residual,
+      p=1-pchisq(model.gaus6$deviance/sev.phi6, model.gaus6$df.residual))
+qchisq(0.95,model.gaus6$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 4 : no 7 masukin 412
+mcins.current11=mcins.current10
+levels(mcins.current11$rating.4)<-recode(levels(mcins.current11$rating.4), "7"="127")
+levels(mcins.current11$rating.4)<-recode(levels(mcins.current11$rating.4), "12"="127")
+head(mcins.current11)
+str(mcins.current11)
+model.gaus7 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current11[mcins.current11$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus7)
+```
+```{r}
+#Deviance
+sev.phi7<-summary(model.gaus7)$dispersion
+cbind(scaled.deviance=model.gaus7$deviance/sev.phi7,df=model.gaus7$df.residual,
+      p=1-pchisq(model.gaus7$deviance/sev.phi7, model.gaus7$df.residual))
+qchisq(0.95,model.gaus7$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 5 : no 12
+mcins.current12=mcins.current9
+levels(mcins.current12$rating.5)<-recode(levels(mcins.current12$rating.5), "1"="12")
+levels(mcins.current12$rating.5)<-recode(levels(mcins.current12$rating.5), "2"="12")
+head(mcins.current12)
+str(mcins.current12)
+model.gaus8 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current12[mcins.current12$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus8)
+```
+```{r}
+#Deviance
+sev.phi8<-summary(model.gaus8)$dispersion
+cbind(scaled.deviance=model.gaus8$deviance/sev.phi8,df=model.gaus8$df.residual,
+      p=1-pchisq(model.gaus8$deviance/sev.phi8, model.gaus8$df.residual))
+qchisq(0.95,model.gaus8$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 1 : no 14
+mcins.current13=mcins.current12
+levels(mcins.current13$rating.1)<-recode(levels(mcins.current13$rating.1), "1"="14")
+levels(mcins.current13$rating.1)<-recode(levels(mcins.current13$rating.1), "4"="14")
+head(mcins.current13)
+str(mcins.current13)
+model.gaus9 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current13[mcins.current13$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus9)
+```
+```{r}
+#Deviance
+sev.phi9<-summary(model.gaus9)$dispersion
+cbind(scaled.deviance=model.gaus9$deviance/sev.phi9,df=model.gaus9$df.residual,
+      p=1-pchisq(model.gaus9$deviance/sev.phi9, model.gaus9$df.residual))
+qchisq(0.95,model.gaus9$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 6 : no 12
+mcins.current14=mcins.current13
+levels(mcins.current14$rating.6)<-recode(levels(mcins.current14$rating.6), "2"="21")
+levels(mcins.current14$rating.6)<-recode(levels(mcins.current14$rating.6), "1"="21")
+head(mcins.current14)
+str(mcins.current14)
+model.gaus10 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                  data = mcins.current14[mcins.current14$nbclaim > 0,], family = gaussian("log"),
+                  weights = nbclaim)
+summary(model.gaus10)
+```
+```{r}
+#Deviance
+sev.phi10<-summary(model.gaus10)$dispersion
+cbind(scaled.deviance=model.gaus10$deviance/sev.phi10,df=model.gaus10$df.residual,
+      p=1-pchisq(model.gaus10$deviance/sev.phi10, model.gaus10$df.residual))
+qchisq(0.95,model.gaus10$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 3 : no 1 masuk basecell (4)
+mcins.current15=mcins.current14
+levels(mcins.current15$rating.3)<-recode(levels(mcins.current15$rating.3), "42"="421")
+levels(mcins.current15$rating.3)<-recode(levels(mcins.current15$rating.3), "1"="421")
+head(mcins.current15)
+str(mcins.current15)
+model.gaus11 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                   data = mcins.current15[mcins.current15$nbclaim > 0,], family = gaussian("log"),
+                   weights = nbclaim)
+summary(model.gaus11)
+```
+```{r}
+#Deviance
+sev.phi11<-summary(model.gaus11)$dispersion
+cbind(scaled.deviance=model.gaus11$deviance/sev.phi11,df=model.gaus11$df.residual,
+      p=1-pchisq(model.gaus11$deviance/sev.phi11, model.gaus11$df.residual))
+qchisq(0.95,model.gaus11$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 4 : no 7 ke 12
+mcins.current16=mcins.current15
+levels(mcins.current16$rating.4)<-recode(levels(mcins.current16$rating.4), "12"="127")
+levels(mcins.current16$rating.4)<-recode(levels(mcins.current16$rating.4), "7"="127")
+head(mcins.current16)
+str(mcins.current16)
+model.gaus12 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                   data = mcins.current16[mcins.current16$nbclaim > 0,], family = gaussian("log"),
+                   weights = nbclaim)
+summary(model.gaus12)
+```
+```{r}
+#Deviance
+sev.phi12<-summary(model.gaus12)$dispersion
+cbind(scaled.deviance=model.gaus12$deviance/sev.phi12,df=model.gaus12$df.residual,
+      p=1-pchisq(model.gaus12$deviance/sev.phi12, model.gaus12$df.residual))
+qchisq(0.95,model.gaus12$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Rating 4 : no 4 ke model 127
+mcins.current17=mcins.current16
+levels(mcins.current17$rating.4)<-recode(levels(mcins.current17$rating.4), "127"="1274")
+levels(mcins.current17$rating.4)<-recode(levels(mcins.current17$rating.4), "4"="1274")
+head(mcins.current17)
+str(mcins.current17)
+model.gaus13 = glm(Severity ~ rating.1 + rating.2 + rating.3 + rating.4 + rating.5 + rating.6,
+                   data = mcins.current17[mcins.current17$nbclaim > 0,], family = gaussian("log"),
+                   weights = nbclaim)
+summary(model.gaus13)
+```
+```{r}
+#Deviance
+sev.phi13<-summary(model.gaus13)$dispersion
+cbind(scaled.deviance=model.gaus13$deviance/sev.phi13,df=model.gaus13$df.residual,
+      p=1-pchisq(model.gaus13$deviance/sev.phi13, model.gaus13$df.residual))
+qchisq(0.95,model.gaus13$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Hapus rating 3
+model.gaus14 = glm(Severity ~ rating.1 + rating.2 + rating.4 + rating.5 + rating.6,
+                   data = mcins.current17[mcins.current17$nbclaim > 0,], family = gaussian("log"),
+                   weights = nbclaim)
+summary(model.gaus14)
+```
+```{r}
+#Deviance
+sev.phi14<-summary(model.gaus14)$dispersion
+cbind(scaled.deviance=model.gaus14$deviance/sev.phi14,df=model.gaus14$df.residual,
+      p=1-pchisq(model.gaus14$deviance/sev.phi14, model.gaus14$df.residual))
+qchisq(0.95,model.gaus14$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Hapus rating 3 dan 1
+model.gaus15 = glm(Severity ~ rating.2 + rating.4 + rating.5 + rating.6,
+                   data = mcins.current17[mcins.current17$nbclaim > 0,], family = gaussian("log"),
+                   weights = nbclaim)
+summary(model.gaus15)
+```
+```{r}
+#Deviance
+sev.phi15<-summary(model.gaus15)$dispersion
+cbind(scaled.deviance=model.gaus15$deviance/sev.phi15,df=model.gaus15$df.residual,
+      p=1-pchisq(model.gaus15$deviance/sev.phi15, model.gaus15$df.residual))
+qchisq(0.95,model.gaus15$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+#Hapus rating 3 dan 1 dan 6
+model.gaus16 = glm(Severity ~ rating.2 + rating.4 + rating.5,
+                   data = mcins.current17[mcins.current17$nbclaim > 0,], family = gaussian("log"),
+                   weights = nbclaim)
+summary(model.gaus16)
+```
+```{r}
+#Deviance
+sev.phi16<-summary(model.gaus16)$dispersion
+cbind(scaled.deviance=model.gaus16$deviance/sev.phi16,df=model.gaus16$df.residual,
+      p=1-pchisq(model.gaus16$deviance/sev.phi16, model.gaus16$df.residual))
+qchisq(0.95,model.gaus16$df.residual)
+#kesimpulan : model fit
+```
+```{r}
+##-- membandingkan model 4 dan 3
+D7 = model.gaus4$deviance - model.gaus3$deviance
+dfD7 = model.gaus4$df.residual - model.gaus3$df.residual
+print(cbind(scaled.deviance=D7,df=dfD7, p=1-pchisq(D7, dfD7)))
+#bagus model 3
+
+##-- membandingkan model 8 dan 5---
+D8 = model.gaus8$deviance - model.gaus5$deviance
+dfD8 = model.gaus8$df.residual - model.gaus5$df.residual
+print(cbind(scaled.deviance=D8,df=dfD8, p=1-pchisq(D8, dfD8)))
+#lebih bagus model 5
+
+##-- membandingkan model 3 dan 2---
+D9 = model.gaus3$deviance - model.gaus2$deviance
+dfD9 = model.gaus3$df.residual - model.gaus2$df.residual
+print(cbind(scaled.deviance=D9,df=dfD9, p=1-pchisq(D9, dfD9)))
+#lebih bagus model 2
+
+##-- membandingkan model 2 dan 1---
+D10 = model.gaus2$deviance - model.gaus1$deviance
+dfD10 = model.gaus2$df.residual - model.gaus1$df.residual
+print(cbind(scaled.deviance=D10,df=dfD10, p=1-pchisq(D10, dfD10)))
+#lebih bagus model 1
+
+##-- membandingkan model 8 dan 6---
+D11 = model.gaus8$deviance - model.gaus6$deviance
+dfD11 = model.gaus8$df.residual - model.gaus6$df.residual
+print(cbind(scaled.deviance=D11,df=dfD11, p=1-pchisq(D11, dfD11)))
+#lebih bagus model 8
+
+##-- membandingkan model 16 dan 15---
+D12 = model.gaus16$deviance - model.gaus15$deviance
+dfD12 = model.gaus16$df.residual - model.gaus15$df.residual
+print(cbind(scaled.deviance=D12,df=dfD12, p=1-pchisq(D12, dfD12)))
+#lebih bagus model 15
+
+##-- membandingkan model 15 dan 14---
+D13 = model.gaus15$deviance - model.gaus14$deviance
+dfD13 = model.gaus15$df.residual - model.gaus14$df.residual
+print(cbind(scaled.deviance=D13,df=dfD13, p=1-pchisq(D13, dfD13)))
+#lebih bagus model 14
+
+##-- membandingkan model 14 dan 13---
+D14 = model.gaus14$deviance - model.gaus13$deviance
+dfD14 = model.gaus14$df.residual - model.gaus13$df.residual
+print(cbind(scaled.deviance=D14,df=dfD14, p=1-pchisq(D14, dfD14)))
+#lebih bagus model 13
+
+##-- membandingkan model 13 dan 12---
+D15 = model.gaus13$deviance - model.gaus12$deviance
+dfD15 = model.gaus13$df.residual - model.gaus12$df.residual
+print(cbind(scaled.deviance=D15,df=dfD15, p=1-pchisq(D15, dfD15)))
+#lebih bagus model 12
+
+##-- membandingkan model 12 dan 11---
+D16 = model.gaus12$deviance - model.gaus11$deviance
+dfD16 = model.gaus12$df.residual - model.gaus11$df.residual
+print(cbind(scaled.deviance=D16,df=dfD16, p=1-pchisq(D16, dfD16)))
+#lebih bagus model 11
+
+##-- membandingkan model 11 dan 10---
+D17 = model.gaus11$deviance - model.gaus10$deviance
+dfD17 = model.gaus11$df.residual - model.gaus10$df.residual
+print(cbind(scaled.deviance=D17,df=dfD17, p=1-pchisq(D17, dfD17)))
+#lebih bagus model 10
+
+##-- membandingkan model 10 dan 9---
+D18 = model.gaus10$deviance - model.gaus9$deviance
+dfD18 = model.gaus10$df.residual - model.gaus9$df.residual
+print(cbind(scaled.deviance=D18,df=dfD18, p=1-pchisq(D18, dfD18)))
+#lebih bagus model 9
+
+##-- membandingkan model 9 dan 8---
+D19 = model.gaus9$deviance - model.gaus8$deviance
+dfD19 = model.gaus9$df.residual - model.gaus8$df.residual
+print(cbind(scaled.deviance=D19,df=dfD19, p=1-pchisq(D19, dfD19)))
+#lebih bagus model 8
+
+##-- membandingkan model 8 dan 7---
+D20 = model.gaus7$deviance - model.gaus8$deviance
+dfD20 = model.gaus7$df.residual - model.gaus8$df.residual
+print(cbind(scaled.deviance=D20,df=dfD20, p=1-pchisq(D20, dfD20)))
+#lebih bagus model 8
+
+##-- membandingkan model 5 dan 4---
+D21 = model.gaus5$deviance - model.gaus4$deviance
+dfD21 = model.gaus5$df.residual - model.gaus4$df.residual
+print(cbind(scaled.deviance=D21,df=dfD21, p=1-pchisq(D21, dfD21)))
+#lebih bagus model 4
+
+##-- membandingkan model 4 dan 3---
+D22 = model.gaus4$deviance - model.gaus3$deviance
+dfD22 = model.gaus4$df.residual - model.gaus3$df.residual
+print(cbind(scaled.deviance=D22,df=dfD22, p=1-pchisq(D22, dfD22)))
+#lebih bagus model 3
+
+##-- membandingkan model dengan model 1---
+D23 = model.gaus13$deviance - model.gaus1$deviance
+dfD23 = model.gaus13$df.residual - model.gaus1$df.residual
+print(cbind(scaled.deviance=D23,df=dfD23, p=1-pchisq(D23, dfD23)))
+#lebih bagus model 1
+```
+```{r}
+##-- membandingkan model 2 dan 1
+D7 = model.gaus2$deviance - model.gaus1$deviance
+dfD7 = model.gaus2$df.residual - model.gaus1$df.residual
+print(cbind(scaled.deviance=D7,df=dfD7, p=1-pchisq(D7, dfD7)))
+#bagus model 1
+
+##-- membandingkan model 3 dan 1---
+D8 = model.gaus3$deviance - model.gaus1$deviance
+dfD8 = model.gaus3$df.residual - model.gaus1$df.residual
+print(cbind(scaled.deviance=D8,df=dfD8, p=1-pchisq(D8, dfD8)))
+#lebih bagus model 1
+
+##-- membandingkan model 4 dan 1---
+D9 = model.gaus4$deviance - model.gaus1$deviance
+dfD9 = model.gaus4$df.residual - model.gaus1$df.residual
+print(cbind(scaled.deviance=D9,df=dfD9, p=1-pchisq(D9, dfD9)))
+#lebih bagus model 1
+
+##-- membandingkan model 5 dan 1---
+D10 = model.gaus5$deviance - model.gaus1$deviance
+dfD10 = model.gaus5$df.residual - model.gaus1$df.residual
+print(cbind(scaled.deviance=D10,df=dfD10, p=1-pchisq(D10, dfD10)))
+#lebih bagus model 1
+
+##-- membandingkan model 8 dan 1---
+D11 = model.gaus8$deviance - model.gaus1$deviance
+dfD11 = model.gaus8$df.residual - model.gaus1$df.residual
+print(cbind(scaled.deviance=D11,df=dfD11, p=1-pchisq(D11, dfD11)))
+#lebih bagus model 8
+
+##-- membandingkan model 13 dan 1---
+D12 = model.gaus13$deviance - model.gaus1$deviance
+dfD12 = model.gaus13$df.residual - model.gaus1$df.residual
+print(cbind(scaled.deviance=D12,df=dfD12, p=1-pchisq(D12, dfD12)))
+#lebih bagus model 15
+```
+```{r}
+#relativities dan interval konfidensinya untuk severity
+Qres<-summary(model.gaus1)
+print(resultsSv<-cbind(exp(model.gaus1$coefficients),exp(model.gaus1$coefficients-qt(0.975,Qres$df.residual)*sqrt(diag(Qres$cov.scaled))),
+                       exp(model.gaus1$coefficients+qt(0.975,Qres$df.residual)*sqrt(diag(Qres$cov.scaled)))))
+colnames(resultsSv)<-c("Relativities","LowerBound","UpperBound")
+resultsSv
+```
+```{r}
+#Nomor 6
+#COMBINE 2 : Misal kita ingin mencari pure premium policy pada saat diketahui 
+#utk frequency > age 18 (rating.11), female (rating.2k), zone 1 (rating.32), mcklass 1 (rating.41), vec-age 3 (rating.52), dan bonus 1 (rating.61)
+#pure premium for the frequency is
+resultsCF[1,1]*resultsCF[2,1]*resultsCF[6,1]*resultsCF[8,1]*resultsCF[13,1]*resultsCF[20,1]*resultsCF[21,1]
+#utk severity > age 18 (rating.11), female (rating.2k), zone 1 (rating.32), mcklass 1 (rating.41), vec-age 3 (rating.52), dan bonus 1 (rating.61)
+#pure premium for the severity is
+resultsSv[1,1]*resultsSv[2,1]*resultsSv[5,1]*resultsSv[7,1]*resultsSv[12,1]*resultsSv[19,1]*resultsSv[20,1]
+#hence, pure premium for the policy is
+resultsCF[1,1]*resultsCF[2,1]*resultsCF[6,1]*resultsCF[8,1]*resultsCF[13,1]*resultsCF[20,1]*resultsCF[21,1]*resultsSv[1,1]*resultsSv[2,1]*resultsSv[5,1]*resultsSv[7,1]*resultsSv[12,1]*resultsSv[19,1]*resultsSv[20,1]
+## The number of claims per policy in the tariff cell is Poisson distributed with mean
+resultsCF[1,1]*resultsCF[2,1]*resultsCF[6,1]*resultsCF[8,1]*resultsCF[13,1]*resultsCF[20,1]*resultsCF[21,1]
+#Hence, for 500 independent 1-year policies in the tariff cell, the total number of claims is also Poisson with mean
+500*resultsCF[1,1]*resultsCF[2,1]*resultsCF[6,1]*resultsCF[8,1]*resultsCF[13,1]*resultsCF[20,1]*resultsCF[21,1]
+## It follows that the probability that this group of policyholders generate more than 3 claims in total is 
+1-ppois(3,500*resultsCF[1,1]*resultsCF[2,1]*resultsCF[6,1]*resultsCF[8,1]*resultsCF[13,1]*resultsCF[20,1]*resultsCF[21,1])
+```
